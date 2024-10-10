@@ -56,7 +56,7 @@ class SimpleSwitch13(app_manager.RyuApp):
               del self.blocked_ports[(dpid, port_no)]
             else:
              self.blocked_ports[(dpid, port_no)] += 1
-          self.logger.info(f"____PORTE ATTUALMENTE BLOCCATE: {self.blocked_ports}____")
+          self.logger.info(f"\n____PORTE ATTUALMENTE BLOCCATE: {self.blocked_ports}____")
           time.sleep(5)
           
 
@@ -78,7 +78,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         out = parser.OFPPacketOut(datapath=datapath, buffer_id=0, in_port=port_no, actions=actions, data=None)
         datapath.send_msg(out)
 
-        self.logger.info(f'\n____PORTA {(dpid, port_no)} RIMOSSA DALLA monitoring_list E BLOCCATA____\n')
+        self.logger.info(f'\n____PORTA {(dpid, port_no)} RIMOSSA DALLA monitoring_list E BLOCCATA____')
 
     def _unblock_port(self, dpid, port_no):
         self.logger.info(f'\n____PORTA {(dpid, port_no)} SBLOCCATA____')
@@ -177,10 +177,10 @@ class SimpleSwitch13(app_manager.RyuApp):
     
             # Monitoraggio delle porte in base al throughput
             if rx_throughput > self.threshold:
-                self.logger.warning('*************LA PORTA {(dpid, port_no)} HA SUPERATO LA SOGLIA CON RX=%f*************', rx_throughput)
+                self.logger.warning('\n*************LA PORTA {(dpid, port_no)} HA SUPERATO LA SOGLIA CON RX=%f*************', rx_throughput)
                 if (dpid, port_no) not in self.monitoring_list and (dpid, port_no) not in self.blocked_ports:
                     self.monitoring_list.append((dpid, port_no))
-                    self.logger.info(f'\n____PORTA {(dpid, port_no)} AGGIUNTA ALLA monitoring_list: {self.monitoring_list}____\n')
+                    self.logger.info(f'\n____PORTA {(dpid, port_no)} AGGIUNTA ALLA monitoring_list: {self.monitoring_list}____')
                 elif (dpid, port_no) in self.monitoring_list and (dpid, port_no) not in self.blocked_ports:
                     self.blocked_ports[(dpid, port_no)] = 0
                     self._block_port(dpid, port_no)
@@ -188,7 +188,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             elif rx_throughput < self.threshold:
                 if (dpid, port_no) in self.monitoring_list:
                     self.monitoring_list.remove((dpid, port_no))
-                    self.logger.info(f'\n____PORTA {(dpid, port_no)} RIMOSSA DALLA monitoring_list -> monitoring_list attuale: {self.monitoring_list}____\n')
+                    self.logger.info(f'\n____PORTA {(dpid, port_no)} RIMOSSA DALLA monitoring_list -> monitoring_list attuale: {self.monitoring_list}____')
   
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
