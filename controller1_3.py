@@ -56,7 +56,7 @@ class SimpleSwitch13(app_manager.RyuApp):
               del self.blocked_ports[(dpid, port_no)]
             else:
              self.blocked_ports[(dpid, port_no)] += 1
-          self.logger.info(f"**********PORTE ATTUALMENTE BLOCCATE: {self.blocked_ports}**********")
+          self.logger.info(f"____PORTE ATTUALMENTE BLOCCATE: {self.blocked_ports}____")
           time.sleep(5)
           
 
@@ -78,10 +78,10 @@ class SimpleSwitch13(app_manager.RyuApp):
         out = parser.OFPPacketOut(datapath=datapath, buffer_id=0, in_port=port_no, actions=actions, data=None)
         datapath.send_msg(out)
 
-        self.logger.info(f'\nPORTA {(dpid, port_no)} RIMOSSA DALLA monitoring_list E BLOCCATA\n')
+        self.logger.info(f'\n____PORTA {(dpid, port_no)} RIMOSSA DALLA monitoring_list E BLOCCATA____\n')
 
     def _unblock_port(self, dpid, port_no):
-        self.logger.info(f'\nPORTA {(dpid, port_no)} SBLOCCATA')
+        self.logger.info(f'\n____PORTA {(dpid, port_no)} SBLOCCATA____')
 
         # Remove the flow entry that drops packets
         datapath = self.datapaths[dpid]
@@ -163,7 +163,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 
                     #self.logger.info(f'\nPorte attive in ricezione sullo switch {dpid}: {self.num_active_ports}\n')
                     if rx_throughput > self.threshold: 
-                        self.logger.warning('*************LA PORTA {(dpid, port_no)} HA SUPERATO LA SOGLIA CON RX=%f', rx_throughput)
+                        self.logger.warning('*************LA PORTA {(dpid, port_no)} HA SUPERATO LA SOGLIA CON RX=%f*************', rx_throughput)
                         if (dpid, port_no) not in self.monitoring_list and (dpid, port_no) not in self.blocked_ports:
                             self.monitoring_list.append((dpid, port_no))
                             self.logger.info(f'\n AGGIUNGO {(dpid, port_no)} NELLA monitoring_list: {self.monitoring_list}\n')
@@ -175,7 +175,7 @@ class SimpleSwitch13(app_manager.RyuApp):
                     elif rx_throughput < self.threshold:
                         if (dpid, port_no) in self.monitoring_list:
                             self.monitoring_list.remove((dpid, port_no))
-                            self.logger.info(f'\nRIMUOVO {(dpid, port_no)} DALLA monitoring_list -> monitoring_list attuale: {self.monitoring_list}\n')
+                            self.logger.info(f'\n____PORTA {(dpid, port_no)} RIMOSSA DALLA monitoring_list -> monitoring_list attuale: {self.monitoring_list}____\n')
 
             
 
