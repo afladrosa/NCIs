@@ -54,7 +54,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             if (time.time() - self.block_time) > 30:
               self._unblock_port(dpid, port_no)
               del self.blocked_ports[(dpid, port_no)]
-           else:
+            else:
              self.blocked_ports[(dpid, port_no)] += 1
           self.logger.info(f"**********PORTE ATTUALMENTE BLOCCATE: {self.blocked_ports}**********")
           time.sleep(5)
