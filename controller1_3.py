@@ -153,7 +153,6 @@ class SimpleSwitch13(app_manager.RyuApp):
                 rx_throughput = (stat.rx_bytes - prev_stats['rx_bytes']) / time_diff
                 tx_throughput = (stat.tx_bytes - prev_stats['tx_bytes']) / time_diff
 
-                #self.logger.info('Switch %s, Porta %s - RX Throughput: %f bytes/sec, TX Throughput: %f bytes/sec', dpid, port_no, rx_throughput, tx_throughput)
 
                 self.active_ports = [p for p in self.port_stats[dpid] if self.port_stats[dpid][p].get('rx_throughput', 0) > self.lower_threshold] #solo porte attive in RICEZIONE
                 self.num_active_ports = len(self.active_ports) -  len(self.blocked_ports) 
@@ -163,8 +162,8 @@ class SimpleSwitch13(app_manager.RyuApp):
                     #dynamic_threshold = (self.threshold + self.threshold * 0.1) / self.num_active_ports if self.num_active_ports > 0 else 1 #questo else serve nel caso si arriva qui con un numero di porte attive = 0 , x evitare errori
 
                     #self.logger.info(f'\nPorte attive in ricezione sullo switch {dpid}: {self.num_active_ports}\n')
-                    if rx_throughput > self.threshold: #rimosso controllo porte attive
-                        self.logger.warning('*************PORTA {(dpid, port_no)} HA SUPERATO LA SOGLIA CON RX=%f', rx_throughput)
+                    if rx_throughput > self.threshold: 
+                        self.logger.warning('*************LA PORTA {(dpid, port_no)} HA SUPERATO LA SOGLIA CON RX=%f', rx_throughput)
                         if (dpid, port_no) not in self.monitoring_list and (dpid, port_no) not in self.blocked_ports:
                             self.monitoring_list.append((dpid, port_no))
                         elif (dpid, port_no) in self.monitoring_list and (dpid, port_no) not in self.blocked_ports:
@@ -177,9 +176,7 @@ class SimpleSwitch13(app_manager.RyuApp):
                             self.monitoring_list.remove((dpid, port_no))
                             self.logger.info(f'\nRIMUOVO {(dpid, port_no)} DALLA monitoring_list -> monitoring_list attuale: {self.monitoring_list}\n')
 
-                # Calculate the final threshold based on the number of active ports
-                            
-
+            
 
                 self.port_stats[dpid][port_no]['rx_bytes'] = stat.rx_bytes
                 self.port_stats[dpid][port_no]['tx_bytes'] = stat.tx_bytes
