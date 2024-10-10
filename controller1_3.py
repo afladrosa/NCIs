@@ -166,11 +166,12 @@ class SimpleSwitch13(app_manager.RyuApp):
                         self.logger.warning('*************LA PORTA {(dpid, port_no)} HA SUPERATO LA SOGLIA CON RX=%f', rx_throughput)
                         if (dpid, port_no) not in self.monitoring_list and (dpid, port_no) not in self.blocked_ports:
                             self.monitoring_list.append((dpid, port_no))
+                            self.logger.info(f'\n AGGIUNGO {(dpid, port_no)} NELLA monitoring_list: {self.monitoring_list}\n')
                         elif (dpid, port_no) in self.monitoring_list and (dpid, port_no) not in self.blocked_ports:
                             self.blocked_ports[(dpid, port_no)] = 0
                             self._block_port(dpid, port_no)
-
-                        self.logger.info(f'\n AGGIUNGO {(dpid, port_no)} NELLA monitoring_list: {self.monitoring_list}\n')
+                            
+                            
                     elif rx_throughput < self.threshold:
                         if (dpid, port_no) in self.monitoring_list:
                             self.monitoring_list.remove((dpid, port_no))
