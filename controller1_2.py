@@ -60,7 +60,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 
             #self.logger.info(f"blocked_ports: {self.blocked_ports}")
             #time.sleep(5)
-         while True:
+        while True:
 
             for (dpid, port_no), count in list(self.blocked_ports.items()):
                 if count > 4:
