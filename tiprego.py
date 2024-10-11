@@ -26,6 +26,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         self.lower_threshold = 0.02 * self.threshold
         self.monitoring_list = []   
         self.blocked_ports = {}
+        self.host_info={} #dizionario per tenere traccia degli host e delle loro porte e switch
 
         self.thread_monitoring_mitigation = threading.Thread(target=self._monitor_and_mitigate) #unico thread che fa sia monitoring che mitigation
         self.thread_monitoring_mitigation.daemon = True
