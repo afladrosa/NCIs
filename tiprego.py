@@ -43,6 +43,8 @@ class SimpleSwitch13(app_manager.RyuApp):
             for dp in self.datapaths.values():
                 self._request_stats(dp)
             self._stats_csv() 
+
+            self._get_topology()
           #Sezione di mitigazione
             for (dpid, port_no), block_time in list(self.blocked_ports.items()):
               if (time.time() - block_time) > 30:
@@ -52,6 +54,13 @@ class SimpleSwitch13(app_manager.RyuApp):
          
             
             time.sleep(2)
+
+    def _get_topology(self):
+        self.logger.info("Gathering topology information")
+        for dpid, datapath in self.datapaths.items():
+            self.logger.info(f"Datapath ID: {dpid}")
+            # Request port statistics to get port details
+            self._request_port_stats(datapath)
 
 
     def _block_port(self, dpid, port_no):
