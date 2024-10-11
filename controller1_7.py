@@ -55,7 +55,7 @@ class SimpleSwitch13(app_manager.RyuApp):
     
                 # Verifica se superano la soglia e blocca la porta se necessario
                 if rx_throughput > self.threshold and (dpid, port_no) not in self.blocked_ports:
-                    self.logger.warning(f'\n*************MITIGAZIONE: PORTA {(dpid, port_no)} BLOCCATA PER SUPERAMENTO SOGLIA*************')
+                    #self.logger.warning(f'\n*************MITIGAZIONE: PORTA {(dpid, port_no)} BLOCCATA PER SUPERAMENTO SOGLIA*************')
                     self.blocked_ports[(dpid, port_no)] = time.time()
                     self._block_port(dpid, port_no)
     
