@@ -31,7 +31,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         self.thread_monitorning.daemon = True
         self.thread_monitorning.start()
 
-        self.thread_mitigation = threading.Thread(target=self._limit_rate)
+        self.thread_mitigation = threading.Thread(target=self._mitigate)
         self.thread_mitigation.daemon = True
         self.thread_mitigation.start()
 
@@ -45,7 +45,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             self._stats_csv() #?
             time.sleep(2)
 
-    def _limit_rate(self):
+    def _mitigate(self):
         self.logger.info("Mitigation thread started")
 
         while True:
