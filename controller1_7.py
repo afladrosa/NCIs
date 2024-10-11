@@ -27,6 +27,8 @@ class SimpleSwitch13(app_manager.RyuApp):
         self.monitoring_list = []   
         self.blocked_ports = {}
 
+        self.lock = threading.Lock()
+
         self.thread_monitorning = threading.Thread(target=self._monitor)
         self.thread_monitorning.daemon = True
         self.thread_monitorning.start()
@@ -35,40 +37,48 @@ class SimpleSwitch13(app_manager.RyuApp):
         self.thread_mitigation.daemon = True
         self.thread_mitigation.start()
 
+
+    # Funzione per il monitoraggio nel thread dedicato
     def _monitor(self):
         self.logger.info("Monitor thread started")
-        if os.path.exists('port_stats.csv'):
-            os.remove('port_stats.csv')
+
+        # penso che possiamo tranquillamente togliere questa parte relativa alla scrittura del file csv che tanto non usiamo
+        #if os.path.exists('port_stats.csv'):
+        #    os.remove('port_stats.csv')
+        
         while True:
-            for dp in self.datapaths.values():
-                self._request_stats(dp)
-            self._stats_csv() #?
+            with self.lock:
+                for dp in self.datapaths.values():
+                    self._request_stats(dp)
+                #self._stats_csv()
             time.sleep(2)
 
-        # Funzione di mitigazione nel thread dedicato
+    # Funzione di mitigazione nel thread dedicato
     def _mitigate(self):
         self.logger.info("Mitigation thread started")
     
         while True:
-            for (dpid, port_no) in self.monitoring_list[:]:  # Iteriamo su una copia della lista
-                rx_throughput = self.port_stats[dpid][port_no].get('rx_throughput', 0)
-    
-                # Verifica se superano la soglia e blocca la porta se necessario
-                if rx_throughput > self.threshold and (dpid, port_no) not in self.blocked_ports:
-                    #self.logger.warning(f'\n*************MITIGAZIONE: PORTA {(dpid, port_no)} BLOCCATA PER SUPERAMENTO SOGLIA*************')
-                    self.blocked_ports[(dpid, port_no)] = time.time()
-                    self._block_port(dpid, port_no)
-    
-            # Controllo delle porte bloccate e sblocco dopo 30 secondi
-            for (dpid, port_no), block_time in list(self.blocked_ports.items()):
-                if (time.time() - block_time) > 30:
-                    self._unblock_port(dpid, port_no)
-                    del self.blocked_ports[(dpid, port_no)]
-    
-            self.logger.info(f"\n____PORTE ATTUALMENTE BLOCCATE: {list(self.blocked_ports.keys())}____")
+            with self.lock:
+                for (dpid, port_no) in self.monitoring_list[:]:  # Iteriamo su una copia della lista
+                    rx_throughput = self.port_stats[dpid][port_no].get('rx_throughput', 0)
+        
+                    # Verifica se superano la soglia e blocca la porta se necessario
+                    if rx_throughput > self.threshold and (dpid, port_no) not in self.blocked_ports:
+                        #self.logger.warning(f'\n*************MITIGAZIONE: PORTA {(dpid, port_no)} BLOCCATA PER SUPERAMENTO SOGLIA*************')
+                        self.blocked_ports[(dpid, port_no)] = time.time()
+                        self._block_port(dpid, port_no)
+        
+                # Controllo delle porte bloccate e sblocco dopo 30 secondi
+                for (dpid, port_no), block_time in list(self.blocked_ports.items()):
+                    if (time.time() - block_time) > 30:
+                        self._unblock_port(dpid, port_no)
+                        del self.blocked_ports[(dpid, port_no)]
+        
+                self.logger.info(f"\n____PORTE ATTUALMENTE BLOCCATE: {list(self.blocked_ports.keys())}____")
             time.sleep(5)
           
 
+    # Funzione per bloccare una porta (chiamata da _mitigate)
     def _block_port(self, dpid, port_no):
         self.monitoring_list.remove((dpid, port_no))
 
@@ -88,6 +98,8 @@ class SimpleSwitch13(app_manager.RyuApp):
 
         self.logger.info(f'\n\n*************PORTA {(dpid, port_no)} RIMOSSA DALLA monitoring_list E BLOCCATA*************')
 
+
+    # Funzione per sbloccare una porta (chiamata da _mitigate)
     def _unblock_port(self, dpid, port_no):
         self.logger.info(f'\n\n*************PORTA {(dpid, port_no)} SBLOCCATA*************')
 
@@ -97,6 +109,8 @@ class SimpleSwitch13(app_manager.RyuApp):
         match = parser.OFPMatch(in_port=port_no)
         self.remove_flow(datapath, match)
 
+
+    # Funzione per rimuovere una regola di flusso (chiamata da _unblock_port)
     def remove_flow(self, datapath, match):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
@@ -110,6 +124,8 @@ class SimpleSwitch13(app_manager.RyuApp):
         )
         datapath.send_msg(mod)
 
+
+    # chiamata dal thread di monitoraggio
     def _request_stats(self, datapath):
         self.logger.debug('send stats request: %016x', datapath.id)
         ofproto = datapath.ofproto
@@ -118,6 +134,8 @@ class SimpleSwitch13(app_manager.RyuApp):
         req = parser.OFPPortStatsRequest(datapath, 0, ofproto.OFPP_ANY)
         datapath.send_msg(req)
 
+
+    # Evento di cambio stato del datapath
     @set_ev_cls(ofp_event.EventOFPStateChange, [MAIN_DISPATCHER, CONFIG_DISPATCHER])
     def _state_change_handler(self, ev):
         datapath = ev.datapath
@@ -130,6 +148,8 @@ class SimpleSwitch13(app_manager.RyuApp):
                 self.logger.info('Unregister datapath: %016x', datapath.id)
                 del self.datapaths[datapath.id]
 
+
+    # Evento di risposta alle statistiche delle porte
     @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
     def _port_stats_reply_handler(self, ev):
         body = ev.msg.body
@@ -151,6 +171,8 @@ class SimpleSwitch13(app_manager.RyuApp):
             # Chiama la funzione per monitorare la porta
             self._monitor_port(dpid, port_no)
     
+
+    # Funzione per aggiornare le statistiche delle porte (chiamata da _port_stats_reply_handler)
     def _update_port_stats(self, dpid, port_no, stat):
         curr_time = time.time()
     
@@ -177,6 +199,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             self.port_stats[dpid][port_no]['tx_throughput'] = tx_throughput
     
 
+    # Funzione per monitorare le porte (chiamata da _port_stats_reply_handler)
     def _monitor_port(self, dpid, port_no):
         if dpid == 3:
             rx_throughput = self.port_stats[dpid][port_no].get('rx_throughput', 0)
@@ -197,6 +220,7 @@ class SimpleSwitch13(app_manager.RyuApp):
                 self.logger.info(f'\n\n*************PORTA {(dpid, port_no)} RIMOSSA DALLA monitoring_list -> monitoring_list attuale: {self.monitoring_list}*************')
 
     
+    # Evento di switch features (configurazione delle regole di default)
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
         datapath = ev.msg.datapath
@@ -208,6 +232,8 @@ class SimpleSwitch13(app_manager.RyuApp):
                                           ofproto.OFPCML_NO_BUFFER)]
         self.add_flow(datapath, 0, match, actions)
 
+
+    # Funzione per aggiungere una regola di flusso (chiamata da _packet_in_handler)
     def add_flow(self, datapath, priority, match, actions, buffer_id=None):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
@@ -223,6 +249,8 @@ class SimpleSwitch13(app_manager.RyuApp):
                                     match=match, instructions=inst)
         datapath.send_msg(mod)
 
+
+    # Evento di pacchetto in ingresso
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
         if ev.msg.msg_len < ev.msg.total_len:
@@ -271,6 +299,8 @@ class SimpleSwitch13(app_manager.RyuApp):
                                   in_port=in_port, actions=actions, data=data)
         datapath.send_msg(out)
 
+
+    # Funzione per scrivere le statistiche delle porte su un file csv (che possiamo eliminare)
     def _stats_csv(self):
         file_exists = os.path.isfile('port_stats.csv')
         with open('port_stats.csv', mode='a') as csv_file:
