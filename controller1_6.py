@@ -27,9 +27,9 @@ class SimpleSwitch13(app_manager.RyuApp):
         self.monitoring_list = []   
         self.blocked_ports = {}
 
-        self.thread_monitorning_mitigation = threading.Thread(target=self._monitor_and_mitigate) #unico thread che fa sia monitoring che mitigation
-        self.thread_monitorning_mitigation.daemon = True
-        self.thread_monitorning_mitigation.start()
+        self.thread_monitoring_mitigation = threading.Thread(target=self._monitor_and_mitigate) #unico thread che fa sia monitoring che mitigation
+        self.thread_monitoring_mitigation.daemon = True
+        self.thread_monitoring_mitigation.start()
 
      
 
