@@ -25,23 +25,28 @@ class Environment(object):
         self.net.addLink(self.cpe3, self.cpe4, bw=3, delay='25ms')
         self.net.addLink(self.cpe4, self.h3, bw=6, delay='0.0025ms')
 
-    def export_topology(self):
-        topology_info = {
-            "hosts": {
-                "h1": {"mac": "00:00:00:00:00:01", "ip": "10.0.0.1"},
-                "h2": {"mac": "00:00:00:00:00:02", "ip": "10.0.0.2"},
-                "h3": {"mac": "00:00:00:00:00:03", "ip": "10.0.0.3"},
-            },
-            "switches": {
-                "s1": ["h1"],
-                "s2": ["h2"],
-                "s3": ["s1", "s2", "s4"],
-                "s4": ["s3", "h3"],
-            }
-        }
+     def export_topology(self):
+        # Creiamo un dizionario per memorizzare le informazioni della topologia
+        topology_info = {}
 
+        # Aggiungi informazioni sugli host con chiavi tuple
+        for i, host in enumerate(self.net.hosts, start=1):
+            topology_info[(i, 1)] = {  # Utilizziamo (i, 1) come chiave
+                "mac": host.MAC(),
+                "ip": host.IP()
+            }
+
+        # Se hai bisogno di collegare altri host o switch, aggiungi qui la logica per farlo
+        for i, switch in enumerate(self.net.switches, start=1):
+            # Supponiamo di voler rappresentare gli switch in un formato simile, puoi adattare come necessario
+            topology_info[(i, 2)] = {
+                "mac": switch.MAC(),
+                "ip": None  # Gli switch non hanno un IP assegnato in questo contesto
+            }
+
+        # Scrivi le informazioni sulla topologia in un file JSON
         with open('topology.json', 'w') as f:
-            json.dump(topology_info, f)
+            json.dump(topology_info, f, indent=4)
 
 ...
 if __name__ == '__main__':
