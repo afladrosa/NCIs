@@ -36,7 +36,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 
      
     def get_host_info(self,filepath):
-        with open(filepath,'r') ad json_file:
+        with open(filepath,'r') as json_file:
             data=json.load(json_file)
             self.host_info={eval(key): value for key, value in data.items()}
             print("***HOST****\n")
@@ -185,7 +185,7 @@ class SimpleSwitch13(app_manager.RyuApp):
                 self.logger.warning(f'\n*************LA PORTA {(dpid, port_no)} HA SUPERATO LA SOGLIA CON RX=%f*************', rx_throughput)
                 self.monitoring_list.append((dpid, port_no))
                 self.logger.info(f'\n*************PORTA {(dpid, port_no)} AGGIUNTA ALLA monitoring_list: {self.monitoring_list}*************')
-            elif (dpid, port_no) in self.monitoring_list and (dpid, port_no) not in self.blocked_ports and (dpid,port_no) in self.host__info:
+            elif (dpid, port_no) in self.monitoring_list and (dpid, port_no) not in self.blocked_ports and (dpid,port_no) in self.host_info:
                 self.logger.warning(f'\n*************LA PORTA {(dpid, port_no)} HA SUPERATO LA SOGLIA CON RX=%f*************', rx_throughput)
                 self.blocked_ports[(dpid, port_no)] = time.time()
                 self._block_port(dpid, port_no)
