@@ -10,6 +10,7 @@ import threading
 import time
 import csv
 import os
+import json
 
 class SimpleSwitch13(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
@@ -28,12 +29,20 @@ class SimpleSwitch13(app_manager.RyuApp):
         self.blocked_ports = {}
         self.host_info={} #dizionario per tenere traccia degli host e delle loro porte e switch
 
+        self.get_host_info("topology.json")
         self.thread_monitoring_mitigation = threading.Thread(target=self._monitor_and_mitigate) #unico thread che fa sia monitoring che mitigation
         self.thread_monitoring_mitigation.daemon = True
         self.thread_monitoring_mitigation.start()
 
      
+    def get_host_info(self,filepath):
+        with open(filepath,'r') ad json_file:
+            data=json.load(json_file)
+            self.host_info={eval(key): value for key, value in data.items()}
+            print("***HOST****\n")
+            print(self.host_info)
 
+    
     def _monitor_and_mitigate(self):
         self.logger.info("Monitor and Mitigate thread started")
         if os.path.exists('port_stats.csv'):
@@ -44,7 +53,6 @@ class SimpleSwitch13(app_manager.RyuApp):
                 self._request_stats(dp)
             self._stats_csv() 
 
-            self._get_topology()
           #Sezione di mitigazione
             for (dpid, port_no), block_time in list(self.blocked_ports.items()):
               if (time.time() - block_time) > 30:
@@ -55,12 +63,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             
             time.sleep(2)
 
-    def _get_topology(self):
-        self.logger.info("Gathering topology information")
-        for dpid, datapath in self.datapaths.items():
-            self.logger.info(f"Datapath ID: {dpid}")
-            # Request port statistics to get port details
-            self._request_port_stats(datapath)
+
 
 
     def _block_port(self, dpid, port_no):
@@ -178,11 +181,11 @@ class SimpleSwitch13(app_manager.RyuApp):
     
             # Monitoraggio delle porte in base al throughput
         if rx_throughput > self.threshold:
-            if ((dpid, port_no) not in self.monitoring_list and (dpid, port_no) not in self.blocked_ports):
+            if ((dpid, port_no) not in self.monitoring_list and (dpid, port_no) not in self.blocked_ports) and (dpid,port_no) in self.host_info:
                 self.logger.warning(f'\n*************LA PORTA {(dpid, port_no)} HA SUPERATO LA SOGLIA CON RX=%f*************', rx_throughput)
                 self.monitoring_list.append((dpid, port_no))
                 self.logger.info(f'\n*************PORTA {(dpid, port_no)} AGGIUNTA ALLA monitoring_list: {self.monitoring_list}*************')
-            elif (dpid, port_no) in self.monitoring_list and (dpid, port_no) not in self.blocked_ports:
+            elif (dpid, port_no) in self.monitoring_list and (dpid, port_no) not in self.blocked_ports and (dpid,port_no) in self.host__info:
                 self.logger.warning(f'\n*************LA PORTA {(dpid, port_no)} HA SUPERATO LA SOGLIA CON RX=%f*************', rx_throughput)
                 self.blocked_ports[(dpid, port_no)] = time.time()
                 self._block_port(dpid, port_no)
