@@ -178,23 +178,23 @@ class SimpleSwitch13(app_manager.RyuApp):
     
 
     def _monitor_port(self, dpid, port_no):
-    if dpid == 3:
-        rx_throughput = self.port_stats[dpid][port_no].get('rx_throughput', 0)
-
-        # Aggiorna la lista delle porte attive
-        self.active_ports = [p for p in self.port_stats[dpid] if self.port_stats[dpid][p].get('rx_throughput', 0) > self.lower_threshold]
-        self.num_active_ports = len(self.active_ports) - len(self.blocked_ports)
-
-        # Registra il throughput per il monitoraggio
-        if rx_throughput > self.threshold:
-            if ((dpid, port_no) not in self.monitoring_list and (dpid, port_no) not in self.blocked_ports):
-                self.logger.warning(f'\n*************LA PORTA {(dpid, port_no)} HA SUPERATO LA SOGLIA CON RX=%f*************', rx_throughput)
-                self.monitoring_list.append((dpid, port_no))
-                self.logger.info(f'\n*************PORTA {(dpid, port_no)} AGGIUNTA ALLA monitoring_list: {self.monitoring_list}*************')
-
-        elif rx_throughput < self.threshold and (dpid, port_no) in self.monitoring_list:
-            self.monitoring_list.remove((dpid, port_no))
-            self.logger.info(f'\n\n*************PORTA {(dpid, port_no)} RIMOSSA DALLA monitoring_list -> monitoring_list attuale: {self.monitoring_list}*************')
+        if dpid == 3:
+            rx_throughput = self.port_stats[dpid][port_no].get('rx_throughput', 0)
+    
+            # Aggiorna la lista delle porte attive
+            self.active_ports = [p for p in self.port_stats[dpid] if self.port_stats[dpid][p].get('rx_throughput', 0) > self.lower_threshold]
+            self.num_active_ports = len(self.active_ports) - len(self.blocked_ports)
+    
+            # Registra il throughput per il monitoraggio
+            if rx_throughput > self.threshold:
+                if ((dpid, port_no) not in self.monitoring_list and (dpid, port_no) not in self.blocked_ports):
+                    self.logger.warning(f'\n*************LA PORTA {(dpid, port_no)} HA SUPERATO LA SOGLIA CON RX=%f*************', rx_throughput)
+                    self.monitoring_list.append((dpid, port_no))
+                    self.logger.info(f'\n*************PORTA {(dpid, port_no)} AGGIUNTA ALLA monitoring_list: {self.monitoring_list}*************')
+    
+            elif rx_throughput < self.threshold and (dpid, port_no) in self.monitoring_list:
+                self.monitoring_list.remove((dpid, port_no))
+                self.logger.info(f'\n\n*************PORTA {(dpid, port_no)} RIMOSSA DALLA monitoring_list -> monitoring_list attuale: {self.monitoring_list}*************')
 
     
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
