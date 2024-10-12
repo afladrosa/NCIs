@@ -181,10 +181,14 @@ class SimpleSwitch13(app_manager.RyuApp):
     
             # Monitoraggio delle porte in base al throughput
         if rx_throughput > self.threshold:
-            if ((dpid, port_no) not in self.monitoring_list and (dpid, port_no) not in self.blocked_ports) and (dpid,port_no) in self.host_info:
+            if ((dpid, port_no) not in self.monitoring_list and (dpid, port_no) not in self.blocked_ports):
+                
                 self.logger.warning(f'\n*************LA PORTA {(dpid, port_no)} HA SUPERATO LA SOGLIA CON RX=%f*************', rx_throughput)
-                self.monitoring_list.append((dpid, port_no))
-                self.logger.info(f'\n*************PORTA {(dpid, port_no)} AGGIUNTA ALLA monitoring_list: {self.monitoring_list}*************')
+                if (dpid,port_no) in self.host_info:
+                    self.monitoring_list.append((dpid, port_no))
+                    self.logger.info(f'\n*************PORTA {(dpid, port_no)} AGGIUNTA ALLA monitoring_list: {self.monitoring_list}*************')
+                else:
+                    self.logger.info(f'\nLA PORTA {(dpid, port_no)} È ATTRAVERSATA DA TRAFFICO INTERMEDIO -> NON AGGIUNTA ALLA monitoring_list')
             elif (dpid, port_no) in self.monitoring_list and (dpid, port_no) not in self.blocked_ports and (dpid,port_no) in self.host_info:
                 self.logger.warning(f'\n*************LA PORTA {(dpid, port_no)} HA SUPERATO LA SOGLIA CON RX=%f*************', rx_throughput)
                 self.blocked_ports[(dpid, port_no)] = time.time()
