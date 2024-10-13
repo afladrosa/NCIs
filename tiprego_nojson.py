@@ -137,6 +137,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             if datapath.id not in self.datapaths:
                 self.logger.info('Register datapath: %016x', datapath.id)
                 self.datapaths[datapath.id] = datapath
+                self.get_host_info()
         elif ev.state == 'DEAD_DISPATCHER':
             if datapath.id in self.datapaths:
                 self.logger.info('Unregister datapath: %016x', datapath.id)
