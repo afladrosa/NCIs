@@ -187,25 +187,40 @@ class SimpleSwitch13(app_manager.RyuApp):
             self.logger.info(f'\n*************LA PORTA {(dpid, port_no)} È STATA RIMOSSA DALLA monitoring_list*************')
             self.monitoring_list.remove((dpid, port_no))
 
+    def _update_host_info(self, dpid, port_no, src_mac):
+        if dpid not in self.host_info:
+            self.host_info[dpid] = {}
+        self.host_info[dpid][src_mac] = port_no
+        self.logger.info(f"Host added: MAC={src_mac}, Switch={dpid}, Port={port_no}")
+        self._print_current_hosts()
+    
+    def _print_current_hosts(self):
+        self.logger.info("Current connected hosts:")
+        for dpid, hosts in self.host_info.items():
+            for mac, port in hosts.items():
+                self.logger.info(f"  - Switch: {dpid}, MAC: {mac}, Port: {port}")
+    
     @set_ev_cls(ofp_event.EventOFPPortStatus, MAIN_DISPATCHER)
     def port_status_change_handler(self, ev):
         port = ev.port
         dpid = ev.datapath.id
-
+    
         # When a new host connects
         if ev.status == 'ADD':
-            self.logger.info(f'Host connected: {port.name} on switch {dpid}')
+            self.logger.info(f'Host connected: {port.name} on switch {dpid}, MAC={port.hw_addr}')
             self._update_host_info(dpid, port.port_no, port.hw_addr)
-
+    
         # When a host disconnects
         elif ev.status == 'DELETE':
-            self.logger.info(f'Host disconnected: {port.name} from switch {dpid}')
+            self.logger.info(f'Host disconnected: {port.name} from switch {dpid}, MAC={port.hw_addr}')
             if dpid in self.host_info and port.hw_addr in self.host_info[dpid]:
                 del self.host_info[dpid][port.hw_addr]
-
+                self._print_current_hosts()  # Print the updated host list after disconnection
+    
         # When a port status changes
         elif ev.status == 'MODIFY':
             self.logger.info(f'Port modified: {port.name} on switch {dpid}')
+
 
     def _stats_csv(self):
         with open('port_stats.csv', mode='a', newline='') as file:
