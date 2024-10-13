@@ -21,53 +21,64 @@ class SimpleSwitch13(app_manager.RyuApp):
         self.active_ports = []
         self.datapaths = {}
         self.port_stats = {}
-        self.threshold = 300000  # Threshold for throughput (bits/second)
+        self.threshold = 300000  # soglia di throughput (bit/secondo)
         self.lower_threshold = 0.02 * self.threshold
-        self.monitoring_list = []
+        self.monitoring_list = []   
         self.blocked_ports = {}
-        self.host_info = {}  # Dictionary to track hosts, their ports, and switches
+        self.host_info = {}  # dizionario per tenere traccia degli host e delle loro porte e switch
 
-        # Start the monitoring and mitigation thread
-        self.thread_monitoring_mitigation = threading.Thread(target=self._monitor_and_mitigate)
+        self.thread_monitoring_mitigation = threading.Thread(target=self._monitor_and_mitigate)  # unico thread che fa sia monitoring che mitigation
         self.thread_monitoring_mitigation.daemon = True
         self.thread_monitoring_mitigation.start()
+
+    # Funzione per aggiornare le informazioni sugli host
+    def _update_host_info(self, dpid, port_no, src_mac):
+        if dpid not in self.host_info:
+            self.host_info[dpid] = {}
+        self.host_info[dpid][src_mac] = port_no
+        print("***HOST****\n")
+        print(self.host_info)
 
     def _monitor_and_mitigate(self):
         self.logger.info("Monitor and Mitigate thread started")
         if os.path.exists('port_stats.csv'):
             os.remove('port_stats.csv')
         while True:
-            # Monitoring section
+            # Sezione di monitoraggio
             for dp in self.datapaths.values():
                 self._request_stats(dp)
-            self._stats_csv()
+            self._stats_csv() 
 
-            # Mitigation section
+            # Sezione di mitigazione
             for (dpid, port_no), block_time in list(self.blocked_ports.items()):
                 if (time.time() - block_time) > 30:
                     self._unblock_port(dpid, port_no)
                     del self.blocked_ports[(dpid, port_no)]
-            self.logger.info(f"\n____CURRENTLY BLOCKED PORTS: {list(self.blocked_ports.keys())}____")
+            self.logger.info(f"\n____PORTE ATTUALMENTE BLOCCATE: {list(self.blocked_ports.keys())}____")
+         
             time.sleep(2)
 
     def _block_port(self, dpid, port_no):
         self.monitoring_list.remove((dpid, port_no))
+
         datapath = self.datapaths[dpid]
         parser = datapath.ofproto_parser
 
         # Create a match for incoming traffic on the port
         match = parser.OFPMatch(in_port=port_no)
-        actions = []  # No actions mean drop packets
+
+        # Create an action to drop packets
+        actions = []
 
         self.add_flow(datapath, 2, match, actions)
 
         out = parser.OFPPacketOut(datapath=datapath, buffer_id=0, in_port=port_no, actions=actions, data=None)
         datapath.send_msg(out)
 
-        self.logger.info(f'\n\n*************PORT {(dpid, port_no)} REMOVED FROM monitoring_list AND BLOCKED*************')
+        self.logger.info(f'\n\n*************PORTA {(dpid, port_no)} RIMOSSA DALLA monitoring_list E BLOCCATA*************')
 
     def _unblock_port(self, dpid, port_no):
-        self.logger.info(f'\n\n*************PORT {(dpid, port_no)} UNBLOCKED*************')
+        self.logger.info(f'\n\n*************PORTA {(dpid, port_no)} SBLOCCATA*************')
 
         # Remove the flow entry that drops packets
         datapath = self.datapaths[dpid]
@@ -113,21 +124,26 @@ class SimpleSwitch13(app_manager.RyuApp):
         body = ev.msg.body
         datapath = ev.msg.datapath
         dpid = datapath.id
-
+    
         self.port_stats.setdefault(dpid, {})
-
+    
         for stat in body:
             port_no = stat.port_no
+    
+            # Skip special port numbers
             if port_no >= ofproto_v1_3.OFPP_MAX:
                 continue
-
-            # Update port stats
+    
+            # Chiama la funzione per aggiornare le statistiche della porta
             self._update_port_stats(dpid, port_no, stat)
+    
+            # Chiama la funzione per monitorare la porta
             self._monitor_port(dpid, port_no)
-
+    
     def _update_port_stats(self, dpid, port_no, stat):
         curr_time = time.time()
-
+    
+        # Inizializza le statistiche se la porta non è presente
         if port_no not in self.port_stats[dpid]:
             self.port_stats[dpid][port_no] = {
                 'rx_bytes': stat.rx_bytes,
@@ -137,90 +153,66 @@ class SimpleSwitch13(app_manager.RyuApp):
         else:
             prev_stats = self.port_stats[dpid][port_no]
             time_diff = curr_time - prev_stats['timestamp']
-
-            # Throughput calculation
+    
+            # Calcolo del throughput
             rx_throughput = (stat.rx_bytes - prev_stats['rx_bytes']) / time_diff
             tx_throughput = (stat.tx_bytes - prev_stats['tx_bytes']) / time_diff
-
-            # Update statistics
+    
+            # Aggiornamento delle statistiche
             self.port_stats[dpid][port_no]['rx_bytes'] = stat.rx_bytes
             self.port_stats[dpid][port_no]['tx_bytes'] = stat.tx_bytes
             self.port_stats[dpid][port_no]['timestamp'] = curr_time
             self.port_stats[dpid][port_no]['rx_throughput'] = rx_throughput
             self.port_stats[dpid][port_no]['tx_throughput'] = tx_throughput
-
+    
     def _monitor_port(self, dpid, port_no):
         rx_throughput = self.port_stats[dpid][port_no].get('rx_throughput', 0)
-
-        # Get active ports
+    
         self.active_ports = [p for p in self.port_stats[dpid] if self.port_stats[dpid][p].get('rx_throughput', 0) > self.lower_threshold]
         self.num_active_ports = len(self.active_ports) - len(self.blocked_ports)
-
-        # Monitor ports based on throughput
+    
+        # Monitoraggio delle porte in base al throughput
         if rx_throughput > self.threshold:
             if ((dpid, port_no) not in self.monitoring_list and (dpid, port_no) not in self.blocked_ports):
-                self.logger.warning(f'\n*************PORT {(dpid, port_no)} EXCEEDED THRESHOLD WITH RX=%f*************', rx_throughput)
-                # Add host info dynamically
-                if (dpid, port_no) not in self.host_info:  # Check if it's not already in host_info
-                    self.host_info[(dpid, port_no)] = {'status': 'active'}  # Track port status
+                
+                self.logger.warning(f'\n*************LA PORTA {(dpid, port_no)} HA SUPERATO LA SOGLIA CON RX=%f*************', rx_throughput)
+                if (dpid, port_no) in self.host_info.get(dpid, {}):
                     self.monitoring_list.append((dpid, port_no))
-                    self.logger.info(f'\n*************PORT {(dpid, port_no)} ADDED TO monitoring_list: {self.monitoring_list}*************')
+                    self.logger.info(f'\n*************PORTA {(dpid, port_no)} AGGIUNTA ALLA monitoring_list: {self.monitoring_list}*************')
+                else:
+                    self.logger.info(f'\nLA PORTA {(dpid, port_no)} È ATTRAVERSATA DA TRAFFICO INTERMEDIO -> NON AGGIUNTA ALLA monitoring_list')
             elif (dpid, port_no) in self.monitoring_list and (dpid, port_no) not in self.blocked_ports:
-                self.logger.warning(f'\n*************PORT {(dpid, port_no)} EXCEEDED THRESHOLD WITH RX=%f*************', rx_throughput)
-                self.blocked_ports[(dpid, port_no)] = time.time()
-                self._block_port(dpid, port_no)
+                self.logger.warning(f'\n*************LA PORTA {(dpid, port_no)} È GIÀ IN monitoring_list: {self.monitoring_list}*************')
+        elif (dpid, port_no) in self.monitoring_list:
+            self.logger.info(f'\n*************LA PORTA {(dpid, port_no)} È STATA RIMOSSA DALLA monitoring_list*************')
+            self.monitoring_list.remove((dpid, port_no))
 
-        elif rx_throughput < self.threshold:
-            if (dpid, port_no) in self.monitoring_list:
-                self.monitoring_list.remove((dpid, port_no))
-                self.logger.info(f'\n\n*************PORT {(dpid, port_no)} REMOVED FROM monitoring_list -> Current monitoring_list: {self.monitoring_list}*************')
-
-    @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
-    def switch_features_handler(self, ev):
-        datapath = ev.msg.datapath
-        ofproto = datapath.ofproto
-        parser = datapath.ofproto_parser
-
-        # Install a flow to send packets from the switch to the controller
-        match = parser.OFPMatch()
-        actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
-        self.add_flow(datapath, 0, match, actions)
-
-        self.logger.info("Switch features installed")
-
-    def add_flow(self, datapath, priority, match, actions, buffer_id=None):
-        ofproto = datapath.ofproto
-        parser = datapath.ofproto_parser
-
-        if buffer_id:
-            inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
-            flow_mod = parser.OFPFlowMod(datapath=datapath, priority=priority, buffer_id=buffer_id,
-                                          match=match, instructions=inst)
-            datapath.send_msg(flow_mod)
-        else:
-            flow_mod = parser.OFPFlowMod(datapath=datapath, priority=priority, match=match,
-                                          instructions=[parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)])
-            datapath.send_msg(flow_mod)
-
-    @set_ev_cls(ofp_event.EventOFPPortStatus, [CONFIG_DISPATCHER, MAIN_DISPATCHER])
-    def port_status_handler(self, ev):
+    @set_ev_cls(ofp_event.EventOFPPortStatus, MAIN_DISPATCHER)
+    def port_status_change_handler(self, ev):
         port = ev.port
         dpid = ev.datapath.id
-        port_no = port.port_no
 
-        if ev.status == ev.OFPPRADD:
-            self.logger.info(f'Port {port_no} added to switch {dpid}')
-            self.host_info[(dpid, port_no)] = {'status': 'active'}
-        
-        elif ev.status == ev.OFPPRDELETE:
-            self.logger.info(f'Port {port_no} removed from switch {dpid}')
-            if (dpid, port_no) in self.host_info:
-                del self.host_info[(dpid, port_no)]
-        
-        elif ev.status == ev.OFPPRMODIFY:
-            self.logger.info(f'Port {port_no} modified on switch {dpid}')
+        # When a new host connects
+        if ev.status == 'ADD':
+            self.logger.info(f'Host connected: {port.name} on switch {dpid}')
+            self._update_host_info(dpid, port.port_no, port.hw_addr)
 
-    @set_ev_cls(ofp_event.EventOFPTableStatsReply, MAIN_DISPATCHER)
-    def table_stats_reply_handler(self, ev):
-        self.logger.info("Table stats received.")
-        # Here you can handle table stats if needed.
+        # When a host disconnects
+        elif ev.status == 'DELETE':
+            self.logger.info(f'Host disconnected: {port.name} from switch {dpid}')
+            if dpid in self.host_info and port.hw_addr in self.host_info[dpid]:
+                del self.host_info[dpid][port.hw_addr]
+
+        # When a port status changes
+        elif ev.status == 'MODIFY':
+            self.logger.info(f'Port modified: {port.name} on switch {dpid}')
+
+    def _stats_csv(self):
+        with open('port_stats.csv', mode='a', newline='') as file:
+            writer = csv.writer(file)
+            if file.tell() == 0:  # If file is empty, write header
+                writer.writerow(['dpid', 'port_no', 'rx_bytes', 'tx_bytes', 'rx_throughput', 'tx_throughput'])
+            for dpid, ports in self.port_stats.items():
+                for port_no, stats in ports.items():
+                    writer.writerow([dpid, port_no, stats['rx_bytes'], stats['tx_bytes'],
+                                     stats.get('rx_throughput', 0), stats.get('tx_throughput', 0)])
