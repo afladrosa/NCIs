@@ -202,7 +202,7 @@ class SimpleSwitch13(app_manager.RyuApp):
     
     @set_ev_cls(ofp_event.EventOFPPortStatus, MAIN_DISPATCHER)
     def port_status_change_handler(self, ev):
-        port = ev.port
+        port = ev.msg.desc  # Correct way to access the port information
         dpid = ev.datapath.id
     
         # When a new host connects
@@ -220,7 +220,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         # When a port status changes
         elif ev.status == 'MODIFY':
             self.logger.info(f'Port modified: {port.name} on switch {dpid}')
-
+    
 
     def _stats_csv(self):
         with open('port_stats.csv', mode='a', newline='') as file:
